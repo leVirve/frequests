@@ -1,25 +1,28 @@
 # -*- coding: utf-8 -*-
 
 """
-grequests
+frequests
 ~~~~~~~~~
 
 This module contains an asynchronous replica of ``requests.api``, powered
-by gevent. All API methods return a ``Request`` instance (as opposed to
+by futures. All API methods return a ``Request`` instance (as opposed to
 ``Response``). A list of requests can be sent with ``map()``.
 """
 
+import sys
+
+if sys.version_info[0] == 2:
+    try:
+        from futures import ThreadPoolExecutor
+    except ImportError:
+        raise RuntimeError('futures is required for frequests on python 2.X')
+else:
+    from concurrent.futures import ThreadPoolExecutor
+
 try:
-    import gevent
-    from gevent import monkey as curious_george
-    from gevent.pool import Pool
+    from requests import api
 except ImportError:
-    raise RuntimeError('Gevent is required for grequests.')
-
-# Monkey-patch.
-curious_george.patch_all(thread=False, select=False)
-
-from requests import api
+    raise RuntimeError('requests is required for frequests')
 
 
 __all__ = (
@@ -46,17 +49,6 @@ def patched(f):
     return wrapped
 
 
-def send(r, pool=None, prefetch=False):
-    """Sends the request object using the specified pool. If a pool isn't
-    specified this method blocks. Pools are useful because you can specify size
-    and can hence limit concurrency."""
-
-    if pool != None:
-        return pool.spawn(r.send, prefetch=prefetch)
-
-    return gevent.spawn(r.send, prefetch=prefetch)
-
-
 # Patched requests.api functions.
 get = patched(api.get)
 options = patched(api.options)
@@ -68,22 +60,25 @@ delete = patched(api.delete)
 request = patched(api.request)
 
 
-def map(requests, prefetch=True, size=None):
+def send(r, prefetch=False):
+    """Just sends the request using its send method and returns its response.  """
+    r.send(prefetch=prefetch)
+    return r.response
+
+def map(requests, prefetch=True, size=1):
     """Concurrently converts a list of Requests to Responses.
 
     :param requests: a collection of Request objects.
     :param prefetch: If False, the content will not be downloaded immediately.
-    :param size: Specifies the number of requests to make at a time. If None, no throttling occurs.
+    :param size: Specifies the number of requests to make at a time. If 1, no throttling occurs.
     """
 
     requests = list(requests)
 
-    pool = Pool(size) if size else None
-    jobs = [send(r, pool, prefetch=prefetch) for r in requests]
-    gevent.joinall(jobs)
+    with ThreadPoolExecutor(max_workers=size) as executor:
+        responses = list(executor.map(send, requests, [prefetch]*len(requests)))
 
-    return [r.response for r in requests]
-
+    return responses
 
 def imap(requests, prefetch=True, size=2):
     """Concurrently converts a generator object of Requests to
@@ -94,13 +89,10 @@ def imap(requests, prefetch=True, size=2):
     :param size: Specifies the number of requests to make at a time. default is 2
     """
 
-    pool = Pool(size)
+    def prefetch_generator():
+        while True:
+            yield prefetch
 
-    def send(r):
-        r.send(prefetch)
-        return r.response
-
-    for r in pool.imap_unordered(send, requests):
-        yield r
-
-    pool.join()
+    with ThreadPoolExecutor(max_workers=size) as executor:
+        for response in executor.map(send, requests, prefetch_generator()):
+            yield response

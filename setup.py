@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-GRequests allows you to use Requests with Gevent to make asyncronous HTTP
+FRequests allows you to use Requests with Gevent to make asyncronous HTTP
 Requests easily.
 
 Usage
@@ -8,7 +8,7 @@ Usage
 
 Usage is simple::
 
-    import grequests
+    import frequests
 
     urls = [
         'http://www.heroku.com',
@@ -20,11 +20,11 @@ Usage is simple::
 
 Create a set of unsent Requests::
 
-    >>> rs = (grequests.get(u) for u in urls)
+    >>> rs = (frequests.get(u) for u in urls)
 
 Send them all at the same time::
 
-    >>> grequests.map(rs)
+    >>> frequests.map(rs)
     [<Response [200]>, <Response [200]>, <Response [200]>, <Response [200]>, <Response [200]>]
 
 """
@@ -32,19 +32,19 @@ Send them all at the same time::
 from setuptools import setup
 
 setup(
-    name='grequests',
+    name='frequests',
     version='0.1.0',
-    url='https://github.com/kennethreitz/grequests',
+    url='https://github.com/i-trofimtschuk/frequests.git',
     license='BSD',
     author='Kenneth Reitz',
     author_email='me@kennethreitz.com',
-    description='Requests + Gevent',
+    description='Requests + Futures',
     long_description=__doc__,
     install_requires=[
-        'gevent',
+        'futures',
         'requests'
     ],
-    py_modules=['grequests'],
+    py_modules=['frequests'],
     zip_safe=False,
     include_package_data=True,
     platforms='any',

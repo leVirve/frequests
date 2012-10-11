@@ -1,7 +1,7 @@
-GRequests: Asyncronous Requests
+FRequests: Asyncronous Requests
 ===============================
 
-GRequests allows you to use Requests with Gevent to make asyncronous HTTP
+FRequests allows you to use Requests with futures to make asyncronous HTTP
 Requests easily.
 
 
@@ -10,7 +10,7 @@ Usage
 
 Usage is simple::
 
-    import grequests
+    import frequests
 
     urls = [
         'http://www.heroku.com',
@@ -22,11 +22,11 @@ Usage is simple::
 
 Create a set of unsent Requests::
 
-    >>> rs = (grequests.get(u) for u in urls)
+    >>> rs = (frequests.get(u) for u in urls)
 
 Send them all at the same time::
 
-    >>> grequests.map(rs)
+    >>> frequests.map(rs)
     [<Response [200]>, <Response [200]>, <Response [200]>, <Response [200]>, <Response [200]>]
 
 
@@ -35,4 +35,4 @@ Installation
 
 Installation is easy with pip::
 
-    $ pip install grequests
+    $ pip install frequests
