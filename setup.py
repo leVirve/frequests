@@ -29,7 +29,13 @@ Send them all at the same time::
 
 """
 
+import sys
 from setuptools import setup
+
+install_requires = ['requests']
+
+if sys.version_info[0] == 2:
+    install_requires.append('futures')
 
 setup(
     name='frequests',
@@ -40,10 +46,7 @@ setup(
     author_email='me@kennethreitz.com',
     description='Requests + Futures',
     long_description=__doc__,
-    install_requires=[
-        'futures',
-        'requests'
-    ],
+    install_requires=install_requires,
     py_modules=['frequests'],
     zip_safe=False,
     include_package_data=True,
