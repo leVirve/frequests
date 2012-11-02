@@ -65,7 +65,7 @@ def send(r, prefetch=False):
     r.send(prefetch=prefetch)
     return r.response
 
-def map(requests, prefetch=True, size=1):
+def map(requests, prefetch=True, size=1, **kwargs):
     """Concurrently converts a list of Requests to Responses.
 
     :param requests: a collection of Request objects.
@@ -76,11 +76,11 @@ def map(requests, prefetch=True, size=1):
     requests = list(requests)
 
     with ThreadPoolExecutor(max_workers=size) as executor:
-        responses = list(executor.map(send, requests, [prefetch]*len(requests)))
+        responses = list(executor.map(send, requests, [prefetch]*len(requests), **kwargs))
 
     return responses
 
-def imap(requests, prefetch=True, size=2):
+def imap(requests, prefetch=True, size=2, **kwargs):
     """Concurrently converts a generator object of Requests to
     a generator of Responses.
 
@@ -94,5 +94,5 @@ def imap(requests, prefetch=True, size=2):
             yield prefetch
 
     with ThreadPoolExecutor(max_workers=size) as executor:
-        for response in executor.map(send, requests, prefetch_generator()):
+        for response in executor.map(send, requests, prefetch_generator(), **kwargs):
             yield response
