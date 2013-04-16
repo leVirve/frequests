@@ -10,6 +10,7 @@ by futures. All API methods return a ``Request`` instance (as opposed to
 """
 
 import sys
+from functools import partial
 
 if sys.version_info[0] == 2:
     try:
@@ -20,7 +21,7 @@ else:
     from concurrent.futures import ThreadPoolExecutor
 
 try:
-    from requests import api
+    from requests import Session
 except ImportError:
     raise RuntimeError('requests is required for frequests')
 
@@ -31,68 +32,94 @@ __all__ = (
 )
 
 
-def patched(f):
-    """Patches a given API function to not send."""
+class AsyncRequest(object):
+    """ Asynchronous request.
 
-    def wrapped(*args, **kwargs):
+    Accept same parameters as ``Session.request`` and some additional:
 
-        kwargs['return_response'] = False
-        kwargs['prefetch'] = True
+    :param session: Session which will do request
+    :param callback: Callback called on response.
+    Same as passing ``hooks={'response': callback}``
+    """
+    def __init__(self, method, url, **kwargs):
+        #: Request method
+        self.method = method
+        #: URL to request
+        self.url = url
+        #: Associated ``Session``
+        self.session = kwargs.pop('session', None)
+        if self.session is None:
+            self.session = Session()
 
-        config = kwargs.get('config', {})
-        config.update(safe_mode=True)
+        callback = kwargs.pop('callback', None)
+        if callback:
+            kwargs['hooks'] = {'response': callback}
 
-        kwargs['config'] = config
+        #: The rest arguments for ``Session.request``
+        self.kwargs = kwargs
+        #: Resulting ``Response``
+        self.response = None
 
-        return f(*args, **kwargs)
+    def send(self, **kwargs):
+        """
+        Prepares request based on parameter passed to constructor and optional ``kwargs```.
+        Then sends request and saves response to :attr:`response`
 
-    return wrapped
+        :returns: ``Response``
+        """
+        merged_kwargs = {}
+        merged_kwargs.update(self.kwargs)
+        merged_kwargs.update(kwargs)
+        self.response = self.session.request(self.method,
+                                              self.url, **merged_kwargs)
+        return self.response
 
-
-# Patched requests.api functions.
-get = patched(api.get)
-options = patched(api.options)
-head = patched(api.head)
-post = patched(api.post)
-put = patched(api.put)
-patch = patched(api.patch)
-delete = patched(api.delete)
-request = patched(api.request)
-
-
-def send(r, prefetch=False):
+def send(r, stream=False):
     """Just sends the request using its send method and returns its response.  """
-    r.send(prefetch=prefetch)
+    r.send(stream=stream)
     return r.response
 
-def map(requests, prefetch=True, size=1, **kwargs):
+# Shortcuts for creating AsyncRequest with appropriate HTTP method
+get = partial(AsyncRequest, 'GET')
+options = partial(AsyncRequest, 'OPTIONS')
+head = partial(AsyncRequest, 'HEAD')
+post = partial(AsyncRequest, 'POST')
+put = partial(AsyncRequest, 'PUT')
+patch = partial(AsyncRequest, 'PATCH')
+delete = partial(AsyncRequest, 'DELETE')
+
+# synonym
+def request(method, url, **kwargs):
+    return AsyncRequest(method, url, **kwargs)
+
+def map(requests, stream=True, size=1, **kwargs):
     """Concurrently converts a list of Requests to Responses.
 
     :param requests: a collection of Request objects.
-    :param prefetch: If False, the content will not be downloaded immediately.
+    :param stream: If False, the content will not be downloaded immediately.
     :param size: Specifies the number of requests to make at a time. If 1, no throttling occurs.
     """
 
     requests = list(requests)
 
     with ThreadPoolExecutor(max_workers=size) as executor:
-        responses = list(executor.map(send, requests, [prefetch]*len(requests), **kwargs))
+        responses = list(executor.map(send, requests, [stream]*len(requests), **kwargs))
 
     return responses
 
-def imap(requests, prefetch=True, size=2, **kwargs):
+def imap(requests, stream=True, size=2, **kwargs):
     """Concurrently converts a generator object of Requests to
     a generator of Responses.
 
     :param requests: a generator of Request objects.
-    :param prefetch: If False, the content will not be downloaded immediately.
+    :param stream: If False, the content will not be downloaded immediately.
     :param size: Specifies the number of requests to make at a time. default is 2
     """
 
-    def prefetch_generator():
+    def stream():
         while True:
-            yield prefetch
+            yield stream
 
     with ThreadPoolExecutor(max_workers=size) as executor:
-        for response in executor.map(send, requests, prefetch_generator(), **kwargs):
+        for response in executor.map(send, requests, stream(), **kwargs):
             yield response
