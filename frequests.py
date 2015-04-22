@@ -25,12 +25,23 @@ try:
 except ImportError:
     raise RuntimeError('requests is required for frequests')
 
+try:
+    from sloq import SlowQueue
+except ImportError:
+    raise RuntimeError('sloq is required for this branch of frequests')
+
+
+class RateLimitedThreadPoolExecutor(ThreadPoolExecutor):
+    def __init__(self, max_workers, limit=None):
+        super(RateLimitedThreadPoolExecutor, self).__init__(max_workers)
+        if limit:
+            self._work_queue = SlowQueue(release_tick=float(limit[1])/limit[0])
+
 
 __all__ = (
     'map', 'imap',
     'get', 'options', 'head', 'post', 'put', 'patch', 'delete', 'request'
 )
-
 
 class AsyncRequest(object):
     """ Asynchronous request.
@@ -92,34 +103,36 @@ delete = partial(AsyncRequest, 'DELETE')
 def request(method, url, **kwargs):
     return AsyncRequest(method, url, **kwargs)
 
-def map(requests, stream=True, size=1, **kwargs):
+def map(requests, stream=True, size=1, limit=None, **kwargs):
     """Concurrently converts a list of Requests to Responses.
 
     :param requests: a collection of Request objects.
     :param stream: If False, the content will not be downloaded immediately.
-    :param size: Specifies the number of requests to make at a time. If 1, no throttling occurs.
+    :param size: Specifies the number of parallel requests that will be made.
+    :param limit: Specifies a throttling (max_requests, per_seconds).
     """
 
     requests = list(requests)
 
-    with ThreadPoolExecutor(max_workers=size) as executor:
+    with RateLimitedThreadPoolExecutor(max_workers=size, limit=limit) as executor:
         responses = list(executor.map(send, requests, [stream]*len(requests), **kwargs))
 
     return responses
 
-def imap(requests, stream=True, size=2, **kwargs):
+def imap(requests, stream=True, size=2, limit=None, **kwargs):
     """Concurrently converts a generator object of Requests to
     a generator of Responses.
 
     :param requests: a generator of Request objects.
     :param stream: If False, the content will not be downloaded immediately.
     :param size: Specifies the number of requests to make at a time. default is 2
+    :param limit: Specifies a throttling (max_requests, per_seconds).
     """
 
     def stream():
         while True:
             yield stream
 
-    with ThreadPoolExecutor(max_workers=size) as executor:
+    with RateLimitedThreadPoolExecutor(max_workers=size, limit=limit) as executor:
         for response in executor.map(send, requests, stream(), **kwargs):
             yield response
