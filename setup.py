@@ -39,7 +39,7 @@ if sys.version_info[0] == 2:
 
 setup(
     name='frequests',
-    version='0.1.0',
+    version='0.1.1',
     url='https://github.com/i-trofimtschuk/frequests.git',
     license='BSD',
     author='Kenneth Reitz',
