@@ -12,13 +12,14 @@ by futures. All API methods return a ``Request`` instance (as opposed to
 import sys
 from functools import partial
 
-if sys.version_info[0] == 2:
-    try:
-        from futures import ThreadPoolExecutor
-    except ImportError:
-        raise RuntimeError('futures is required for frequests on python 2.X')
-else:
-    from concurrent.futures import ThreadPoolExecutor
+try:
+    from concurrent.futures import ThreadPoolExecutor  # this works in python 3.X and newer version of futures in python 2.X
+except ImportError:
+    if sys.version_info[0] == 2:
+        try:
+            from futures import ThreadPoolExecutor  # for older versions of futures in python 2.x
+        except ImportError:
+            raise RuntimeError('futures is required for frequests on python 2.X')
 
 try:
     from requests import Session
