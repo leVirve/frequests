@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
-
 """
-frequests
+prequests
 ~~~~~~~~~
 
 This module contains an asynchronous replica of ``requests.api``, powered
@@ -9,17 +7,8 @@ by futures. All API methods return a ``Request`` instance (as opposed to
 ``Response``). A list of requests can be sent with ``map()``.
 """
 
-import sys
 from functools import partial
-
-try:
-    from concurrent.futures import ThreadPoolExecutor  # this works in python 3.X and newer version of futures in python 2.X
-except ImportError:
-    if sys.version_info[0] == 2:
-        try:
-            from futures import ThreadPoolExecutor  # for older versions of futures in python 2.x
-        except ImportError:
-            raise RuntimeError('futures is required for frequests on python 2.X')
+from multiprocessing.dummy import Pool
 
 try:
     from requests import Session
@@ -28,7 +17,7 @@ except ImportError:
 
 
 __all__ = (
-    'map', 'imap',
+    'map', 'imap', 'imap_unordered'
     'get', 'options', 'head', 'post', 'put', 'patch', 'delete', 'request'
 )
 
@@ -72,8 +61,9 @@ class AsyncRequest(object):
         merged_kwargs.update(self.kwargs)
         merged_kwargs.update(kwargs)
         self.response = self.session.request(self.method,
-                                              self.url, **merged_kwargs)
+                                             self.url, **merged_kwargs)
         return self.response
+
 
 def send(r, stream=False):
     """Just sends the request using its send method and returns its response.  """
@@ -89,11 +79,13 @@ put = partial(AsyncRequest, 'PUT')
 patch = partial(AsyncRequest, 'PATCH')
 delete = partial(AsyncRequest, 'DELETE')
 
+
 # synonym
 def request(method, url, **kwargs):
     return AsyncRequest(method, url, **kwargs)
 
-def map(requests, stream=True, size=1, **kwargs):
+
+def map(requests, process=8, stream=True, size=1, **kwargs):
     """Concurrently converts a list of Requests to Responses.
 
     :param requests: a collection of Request objects.
@@ -103,12 +95,13 @@ def map(requests, stream=True, size=1, **kwargs):
 
     requests = list(requests)
 
-    with ThreadPoolExecutor(max_workers=size) as executor:
-        responses = list(executor.map(send, requests, [stream]*len(requests), **kwargs))
+    with Pool(process) as pool:
+        responses = pool.map(send, requests)
 
     return responses
 
-def imap(requests, stream=True, size=2, **kwargs):
+
+def imap(requests, process=8, stream=True, size=2, **kwargs):
     """Concurrently converts a generator object of Requests to
     a generator of Responses.
 
@@ -117,10 +110,20 @@ def imap(requests, stream=True, size=2, **kwargs):
     :param size: Specifies the number of requests to make at a time. default is 2
     """
 
-    def stream():
-        while True:
-            yield stream
+    with Pool(process) as pool:
+        for response in pool.imap(send, requests):
+            yield response
 
-    with ThreadPoolExecutor(max_workers=size) as executor:
-        for response in executor.map(send, requests, stream(), **kwargs):
+
+def imap_unordered(requests, process=8, stream=True, size=2, **kwargs):
+    """Concurrently converts a generator object of Requests to
+    a generator of Responses.
+
+    :param requests: a generator of Request objects.
+    :param stream: If False, the content will not be downloaded immediately.
+    :param size: Specifies the number of requests to make at a time. default is 2
+    """
+
+    with Pool(process) as pool:
+        for response in pool.imap_unordered(send, requests):
             yield response

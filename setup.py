@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-FRequests allows you to use Requests with Gevent to make asyncronous HTTP
+PRequests allows you to use Requests with multiprocessing.pool to make asyncronous HTTP
 Requests easily.
 
 Usage
@@ -8,7 +8,7 @@ Usage
 
 Usage is simple::
 
-    import frequests
+    import prequests
 
     urls = [
         'http://www.heroku.com',
@@ -20,34 +20,31 @@ Usage is simple::
 
 Create a set of unsent Requests::
 
-    >>> rs = (frequests.get(u) for u in urls)
+    >>> rs = (prequests.get(u) for u in urls)
 
 Send them all at the same time::
 
-    >>> frequests.map(rs)
+    >>> prequests.map(rs)
     [<Response [200]>, <Response [200]>, <Response [200]>, <Response [200]>, <Response [200]>]
 
 """
 
-import sys
 from setuptools import setup
 
 install_requires = ['requests']
 
-if sys.version_info[0] == 2:
-    install_requires.append('futures')
 
 setup(
-    name='frequests',
-    version='0.1.1',
-    url='https://github.com/i-trofimtschuk/frequests.git',
+    name='prequests',
+    version='0.1.0',
+    url='https://github.com/leVirve/prequests.git',
     license='BSD',
     author='Kenneth Reitz',
     author_email='me@kennethreitz.com',
-    description='Requests + Futures',
+    description='Requests + Multiprocessing.Pool',
     long_description=__doc__,
     install_requires=install_requires,
-    py_modules=['frequests'],
+    py_modules=['prequests'],
     zip_safe=False,
     include_package_data=True,
     platforms='any',
