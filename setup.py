@@ -36,7 +36,7 @@ install_requires = ['requests']
 
 setup(
     name='prequests',
-    version='0.1.0',
+    version='0.1.1',
     url='https://github.com/leVirve/prequests.git',
     license='BSD',
     author='Kenneth Reitz',

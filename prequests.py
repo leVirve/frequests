@@ -7,7 +7,6 @@ by futures. All API methods return a ``Request`` instance (as opposed to
 ``Response``). A list of requests can be sent with ``map()``.
 """
 
-import contextlib
 import traceback
 from functools import partial
 from multiprocessing.dummy import Pool
@@ -15,7 +14,7 @@ from multiprocessing.dummy import Pool
 try:
     from requests import Session
 except ImportError:
-    raise RuntimeError('requests is required for frequests')
+    raise RuntimeError('requests is required for prequests')
 
 
 __all__ = (
@@ -91,7 +90,7 @@ def request(method, url, **kwargs):
     return AsyncRequest(method, url, **kwargs)
 
 
-def map(requests, stream=True, size=1, exception_handler=None):
+def map(requests, stream=True, pool=None, size=1, exception_handler=None):
     """Concurrently converts a list of Requests to Responses.
 
     :param requests: a collection of Request objects.
@@ -100,10 +99,10 @@ def map(requests, stream=True, size=1, exception_handler=None):
     :param exception_handler: Callback function, called when exception occured. Params: Request, Exception
     """
 
+    pool = pool if pool else Pool(size)
     requests = list(requests)
 
-    with contextlib.closing(Pool(size)) as pool:
-        requests = pool.map(send, requests)
+    requests = pool.map(send, requests)
 
     ret = []
     for request in requests:
@@ -114,10 +113,13 @@ def map(requests, stream=True, size=1, exception_handler=None):
         else:
             ret.append(None)
 
+    if not pool:
+        pool.close()
+
     return ret
 
 
-def imap(requests, stream=True, size=2, exception_handler=None):
+def imap(requests, stream=True, pool=None, size=2, exception_handler=None):
     """Concurrently converts a generator object of Requests to
     a generator of Responses.
 
@@ -130,15 +132,19 @@ def imap(requests, stream=True, size=2, exception_handler=None):
     def send(r):
         return r.send(stream=stream)
 
-    with contextlib.closing(Pool(size)) as pool:
-        for response in pool.imap(send, requests):
-            if request.response is not None:
-                yield request.response
-            elif exception_handler:
-                exception_handler(request, request.exception)
+    pool = pool if pool else Pool(size)
+
+    for request in pool.imap(send, requests):
+        if request.response is not None:
+            yield request.response
+        elif exception_handler:
+            exception_handler(request, request.exception)
+
+    if not pool:
+        pool.close()
 
 
-def imap_unordered(requests, stream=True, size=2, exception_handler=None):
+def imap_unordered(requests, stream=True, pool=None, size=2, exception_handler=None):
     """Concurrently converts a generator object of Requests to
     a generator of Responses.
 
@@ -151,9 +157,14 @@ def imap_unordered(requests, stream=True, size=2, exception_handler=None):
     def send(r):
         return r.send(stream=stream)
 
+    pool = pool if pool else Pool(size)
+
     with contextlib.closing(Pool(size)) as pool:
-        for response in pool.imap_unordered(send, requests):
+        for request in pool.imap_unordered(send, requests):
             if request.response is not None:
                 yield request.response
             elif exception_handler:
                 exception_handler(request, request.exception)
+
+    if not pool:
+        pool.close()
