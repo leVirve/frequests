@@ -1,7 +1,7 @@
 PRequests: Asyncronous Requests
 ===============================
 
-PRequests allows you to use Requests with futures to make asyncronous HTTP
+PRequests allows you to use Requests with Threadpool to make asyncronous HTTP
 Requests easily.
 
 
