@@ -7,8 +7,9 @@ by futures. All API methods return a ``Request`` instance (as opposed to
 ``Response``). A list of requests can be sent with ``map()``.
 """
 
-from functools import partial
 import contextlib
+import traceback
+from functools import partial
 from multiprocessing.dummy import Pool
 
 try:
@@ -61,9 +62,13 @@ class AsyncRequest(object):
         merged_kwargs = {}
         merged_kwargs.update(self.kwargs)
         merged_kwargs.update(kwargs)
-        self.response = self.session.request(self.method,
-                                             self.url, **merged_kwargs)
-        return self.response
+        try:
+            self.response = self.session.request(
+                                self.method, self.url, **merged_kwargs)
+        except Exception as e:
+            self.exception = e
+            self.traceback = traceback.format_exc()
+        return self
 
 
 def send(r, stream=False):
@@ -86,45 +91,69 @@ def request(method, url, **kwargs):
     return AsyncRequest(method, url, **kwargs)
 
 
-def map(requests, process=8, stream=True, size=1, **kwargs):
+def map(requests, stream=True, size=1, exception_handler=None):
     """Concurrently converts a list of Requests to Responses.
 
     :param requests: a collection of Request objects.
     :param stream: If False, the content will not be downloaded immediately.
-    :param size: Specifies the number of requests to make at a time. If 1, no throttling occurs.
+    :param size: Specifies the number of workers to run at a time. If 1, no parallel processing.
+    :param exception_handler: Callback function, called when exception occured. Params: Request, Exception
     """
 
     requests = list(requests)
 
-    with contextlib.closing(Pool(process)) as pool:
-        responses = pool.map(send, requests)
+    with contextlib.closing(Pool(size)) as pool:
+        requests = pool.map(send, requests)
 
-    return responses
+    ret = []
+    for request in requests:
+        if request.response is not None:
+            ret.append(request.response)
+        elif exception_handler and hasattr(request, 'exception'):
+            ret.append(exception_handler(request, request.exception))
+        else:
+            ret.append(None)
+
+    return ret
 
 
-def imap(requests, process=8, stream=True, size=2, **kwargs):
+def imap(requests, stream=True, size=2, exception_handler=None):
     """Concurrently converts a generator object of Requests to
     a generator of Responses.
 
     :param requests: a generator of Request objects.
     :param stream: If False, the content will not be downloaded immediately.
     :param size: Specifies the number of requests to make at a time. default is 2
+    :param exception_handler: Callback function, called when exception occured. Params: Request, Exception
     """
 
-    with contextlib.closing(Pool(process)) as pool:
+    def send(r):
+        return r.send(stream=stream)
+
+    with contextlib.closing(Pool(size)) as pool:
         for response in pool.imap(send, requests):
-            yield response
+            if request.response is not None:
+                yield request.response
+            elif exception_handler:
+                exception_handler(request, request.exception)
 
 
-def imap_unordered(requests, process=8, stream=True, size=2, **kwargs):
+def imap_unordered(requests, stream=True, size=2, exception_handler=None):
     """Concurrently converts a generator object of Requests to
     a generator of Responses.
 
     :param requests: a generator of Request objects.
     :param stream: If False, the content will not be downloaded immediately.
     :param size: Specifies the number of requests to make at a time. default is 2
+    :param exception_handler: Callback function, called when exception occured. Params: Request, Exception
     """
 
-    with contextlib.closing(Pool(process)) as pool:
+    def send(r):
+        return r.send(stream=stream)
+
+    with contextlib.closing(Pool(size)) as pool:
         for response in pool.imap_unordered(send, requests):
-            yield response
+            if request.response is not None:
+                yield request.response
+            elif exception_handler:
+                exception_handler(request, request.exception)
