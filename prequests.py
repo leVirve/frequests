@@ -19,7 +19,7 @@ except ImportError:
 
 
 __all__ = (
-    'map', 'imap', 'imap_unordered'
+    'map', 'imap', 'imap_unordered',
     'get', 'options', 'head', 'post', 'put', 'patch', 'delete', 'request'
 )
 
