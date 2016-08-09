@@ -8,6 +8,7 @@ by futures. All API methods return a ``Request`` instance (as opposed to
 """
 
 from functools import partial
+import contextlib
 from multiprocessing.dummy import Pool
 
 try:
@@ -95,7 +96,7 @@ def map(requests, process=8, stream=True, size=1, **kwargs):
 
     requests = list(requests)
 
-    with Pool(process) as pool:
+    with contextlib.closing(Pool(process)) as pool:
         responses = pool.map(send, requests)
 
     return responses
@@ -110,7 +111,7 @@ def imap(requests, process=8, stream=True, size=2, **kwargs):
     :param size: Specifies the number of requests to make at a time. default is 2
     """
 
-    with Pool(process) as pool:
+    with contextlib.closing(Pool(process)) as pool:
         for response in pool.imap(send, requests):
             yield response
 
@@ -124,6 +125,6 @@ def imap_unordered(requests, process=8, stream=True, size=2, **kwargs):
     :param size: Specifies the number of requests to make at a time. default is 2
     """
 
-    with Pool(process) as pool:
+    with contextlib.closing(Pool(process)) as pool:
         for response in pool.imap_unordered(send, requests):
             yield response
